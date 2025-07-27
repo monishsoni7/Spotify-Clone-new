@@ -1,83 +1,49 @@
-import express from "express";
-import dotenv from "dotenv";
-import { clerkMiddleware } from "@clerk/express";
-import fileUpload from "express-fileupload";
-import path from "path";
-import cors from "cors";
-import fs from "fs";
-import { createServer } from "http";
-import cron from "node-cron";
-import helmet from "helmet"; // ✅ NEW
-
-import { initializeSocket } from "./lib/socket.js";
-
-import { connectDB } from "./lib/db.js";
-import userRoutes from "./routes/user.route.js";
-import adminRoutes from "./routes/admin.route.js";
-import authRoutes from "./routes/auth.route.js";
-import songRoutes from "./routes/song.route.js";
-import albumRoutes from "./routes/album.route.js";
-import statRoutes from "./routes/stat.route.js";
+import express from 'express';
+import { clerkMiddleware } from '@clerk/express';
+import dotenv from 'dotenv';
+import cors from 'cors';
+import UserRoutes from './routes/user.route.js';
+import adminRoutes from './routes/admin.route.js';
+import fileUpload from 'express-fileupload';
+import path from 'path';
+import fs from 'fs';
+import albumRoutes from './routes/album.route.js';   
+import statsRoutes from './routes/stat.route.js';
+import authRoutes from './routes/auth.route.js';
+import songRoutes from './routes/song.route.js';
+import { connectDB } from './lib/db.js';
+import { createServer } from 'http';
+import { initializeSocket } from './lib/Socket.js';
+import cron from "node-cron"
 
 dotenv.config();
-
 const __dirname = path.resolve();
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5000;
 
 const httpServer = createServer(app);
 initializeSocket(httpServer);
 
-// ✅ Helmet for security headers
-app.use(helmet());
+app.use(cors(
+  {
+    origin: process.env.CORS_ORIGIN || '*',
+    credentials:true
+  }
+))
 
-// ✅ Force HTTPS in production (Render uses x-forwarded-proto)
-app.use((req, res, next) => {
-	// Skip redirect for OPTIONS requests (CORS preflight)
-	if (req.method === "OPTIONS") {
-		return next();
-	}
-	// Only redirect in production environment
-	if (process.env.NODE_ENV === "production" && req.headers["x-forwarded-proto"] !== "https") {
-		return res.redirect(`https://${req.headers.host}${req.url}`);
-	}
-	next();
-});
+app.use(express.json());
+app.use(clerkMiddleware());
 
-// ✅ Updated CORS for production
-app.use(
-	cors({
-		origin: [
-			"http://localhost:3000",
-			"http://localhost:3001",
-			"https://jamlink-1.onrender.com", // Render domain
-		],
-		credentials: true,
-	})
-);
+app.use(fileUpload({
+  useTempFiles: true,
+  tempFileDir: path.join(__dirname,"temp"),
+  createParentPath: true,
+  limits:{
+    fileSize:1024 * 1024 * 10 // 10 MB
+  }
+}))
 
-app.use(express.json()); // to parse req.body
-app.use(clerkMiddleware()); // Adds auth to req object
-
-app.use(
-	fileUpload({
-		useTempFiles: true,
-		tempFileDir: path.join(__dirname, "tmp"),
-		createParentPath: true,
-		limits: {
-			fileSize: 10 * 1024 * 1024, // 10MB max
-		},
-	})
-);
-
-// ✅ OPTIONAL: Protect /admin route (if not already via Clerk)
-// app.use("/api/admin", (req, res, next) => {
-// 	if (!req.auth?.userId) {
-// 		return res.status(401).json({ message: "Unauthorized" });
-// 	}
-// 	next();
-// });
-
+// cron.schedule()
 const tempDir = path.join(process.cwd(), "tmp");
 cron.schedule("0 * * * *", () => {
 	if (fs.existsSync(tempDir)) {
@@ -93,32 +59,26 @@ cron.schedule("0 * * * *", () => {
 	}
 });
 
-app.use("/api/users", userRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/auth", authRoutes);
-app.use("/api/songs", songRoutes);
-app.use("/api/albums", albumRoutes);
-app.use("/api/stats", statRoutes);
+app.use("/api/users",UserRoutes)
 
-// ✅ Serve frontend in production
-if (process.env.NODE_ENV === "production") {
-	app.use(express.static(path.join(__dirname, "../frontend/dist")));
-	app.get("*", (req, res) => {
-		res.sendFile(path.resolve(__dirname, "../frontend", "dist", "index.html"));
-	});
+app.use("/api/auth",authRoutes);
+app.use("/api/songs",songRoutes);
+app.use("/api/admin",adminRoutes);
+app.use("/api/albums",albumRoutes);
+app.use("/api/stats",statsRoutes);
+
+if(process.env.NODE_ENV==='production'){
+  app.use(express.static(path.join(__dirname,'../Frontend/dist' )))
+  app.get("*", (req, res) => {
+    res.sendFile(path.resolve(__dirname,'../Frontend/dist/index.html'));
+  })
 }
 
-// ✅ Error handler
-app.use((err, req, res, next) => {
-	res.status(500).json({
-		message:
-			process.env.NODE_ENV === "production"
-				? "Internal server error"
-				: err.message,
-	});
-});
+app.use((err,req,res,next)=>{
+  res.status(500).json({message: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message});
+})
 
 httpServer.listen(PORT, () => {
-	console.log("Server is running on port " + PORT);
-	connectDB();
+  console.log('Server is running on port ' + PORT);
+  connectDB();  
 });
