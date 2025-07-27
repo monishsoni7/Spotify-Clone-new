@@ -19,7 +19,7 @@ import cron from "node-cron"
 dotenv.config();
 const __dirname = path.resolve();
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;
 
 const httpServer = createServer(app);
 initializeSocket(httpServer);
