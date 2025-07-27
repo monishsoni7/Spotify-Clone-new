@@ -68,12 +68,13 @@ app.use("/api/albums",albumRoutes);
 app.use("/api/stats",statsRoutes);
 
 // Always serve frontend unless explicitly in development
-if (process.env.NODE_ENV !== 'development') {
+if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../frontend/dist')));
   app.get('*', (req, res) => {
     res.sendFile(path.resolve(__dirname, '../frontend/dist/index.html'));
   });
 }
+
 
 
 app.use((err,req,res,next)=>{
