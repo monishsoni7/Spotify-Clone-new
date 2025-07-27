@@ -13,7 +13,7 @@ import authRoutes from './routes/auth.route.js';
 import songRoutes from './routes/song.route.js';
 import { connectDB } from './lib/db.js';
 import { createServer } from 'http';
-import { initializeSocket } from './lib/Socket.js';
+import { initializeSocket } from './lib/socket.js';
 import cron from "node-cron"
 
 dotenv.config();
